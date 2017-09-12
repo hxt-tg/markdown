@@ -9,7 +9,7 @@ typedef enum {
 
 char TKS[][16] = {
     "<p>", "</p>\n", "<h1>", "</h1>\n", "<h2>", "</h2>\n", "<h3>", "</h3>\n", "<h4>", "</h4>\n",
-    "<h5>", "</h5>\n", "<h6>", "</h6>\n", "<ul>\n", "</ul>\n", "<li>", "</li>\n", "<em>", "</em>",
+    "<h5>", "</h5\n>", "<h6>", "</h6\n>", "<ul>\n", "</ul>\n", "<li>", "</li>\n", "<em>", "</em>",
     "<a href=\"", "\">", "</a>"
 };
 
@@ -65,7 +65,7 @@ void clear_buf(){
 
 void read_tokens(FILE *fp){
     char c;
-    int tk;
+    int tk, is_first_return = 0;
     int st = NONE;
     clear_tk();
     while ((c = fgetc(fp))!=EOF){
@@ -74,32 +74,18 @@ void read_tokens(FILE *fp){
                 int tagdepth = 0;
                 while ((c = fgetc(fp))=='#' && tagdepth < 6)
                     tagdepth++;
-                if (c == ' '){
-                    while ((c = fgetc(fp)) == ' ') ;
-                    ungetc(c, fp);
+                if (c == ' ')
                     push_tk(output_tk(H1_S+tagdepth*2));
-                }
             }
         }
         else if(c == '*'){
             if ((c = fgetc(fp)) == ' '){
-                while ((c = fgetc(fp)) == ' ') ;
-                ungetc(c, fp);
                 if (_cur == 0 || peek_tk() != LIST_S)
                     push_tk(output_tk(LIST_S));
                 push_tk(output_tk(ITEM_S));
             }
         }
         else if(c == '_'){
-             if (_cur > 0 && peek_tk() == LIST_S){
-                //output_char('\n');
-                output_tk(pop_tk() + 1);
-            }
-
-            if (st == NONE && _cur == 0){
-                push_tk(output_tk(PARA_S));
-                st = PARA;
-            }
             if ((tk = peek_tk()) == EMPH_S)
                 output_tk(pop_tk() + 1);
             else
@@ -127,35 +113,33 @@ void read_tokens(FILE *fp){
             }
             output_tk(LINK_E);
         }
-        else if(c == '\n'){
-            char tempc = fgetc(fp);
-            ungetc (tempc, fp);
+        else if(c == ')'){
 
+        }
+        else if(c == '\n'){
             if (st == NONE){
                 if (_cur == 0) continue;
                 output_tk(pop_tk() + 1);
-                if (peek_tk() == LIST_S && tempc != '*')
-                    output_tk(pop_tk() + 1);
-
             }
             else{
-                if (tempc == EOF) break;
-                if (tempc == '\n' || tempc == '#' || tempc == '*'){
+                if (is_first_return == 0){
+                    is_first_return = 1;
+                    char tempc = fgetc(fp);
+                    if (tempc == EOF) break;
+                    if (tempc != '\n') output_char('\n');
+                    ungetc(tempc, fp);
+                    continue;
+                }else{
                     output_tk(pop_tk() + 1);
                     st = NONE;
                 }
-                else
-                    output_char('\n');
             }
         }
         else{
-            if (_cur > 0 && peek_tk() == LIST_S){
-                //output_char('\n');
-                output_tk(pop_tk() + 1);
-            }
             if (st == NONE && _cur == 0){
                 push_tk(output_tk(PARA_S));
                 st = PARA;
+                is_first_return = 0;
             }
             output_char(c);
         }
@@ -164,10 +148,7 @@ void read_tokens(FILE *fp){
         output_tk(pop_tk() + 1);
 }
 
-int main(){
-    FILE *fp = fopen("test.txt", "r");
-    printf("run here\n");
-    read_tokens(fp);
-    printf("\n\n");
+int main(void){
+    read_tokens(stdin);
     return 0;
 }
